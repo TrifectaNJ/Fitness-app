@@ -107,7 +107,8 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
     });
     
     clearTimeout(timeoutId);
-    return response.ok || response.status === 400; // 400 is expected for HEAD request
+    // 400/401/403 all mean the server is reachable (auth/validation errors, not network errors)
+    return response.ok || response.status === 400 || response.status === 401 || response.status === 403;
   } catch {
     return false;
   }

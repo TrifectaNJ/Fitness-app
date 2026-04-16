@@ -77,10 +77,10 @@ export const EnhancedUserProgressTabComplete: React.FC<UserProgressTabProps> = (
       if (userRole === 'coach' && currentUserId) {
         const { data: assignments } = await supabase
           .from('coach_assignments')
-          .select('assigned_user_id')
+          .select('user_id')
           .eq('coach_id', currentUserId);
-        
-        const userIds = assignments?.map(a => a.assigned_user_id) || [];
+
+        const userIds = assignments?.map(a => a.user_id) || [];
         if (userIds.length > 0) {
           query = query.in('id', userIds);
         } else {
@@ -161,37 +161,146 @@ export const EnhancedUserProgressTabComplete: React.FC<UserProgressTabProps> = (
 
   const fetchWorkoutProgress = async (userId: string) => {
     try {
+      const progressList: WorkoutProgress[] = [];
+      const seenIds = new Set<string>();
+
+      // Source 1: coach_programs directly assigned to this user
+      const { data: coachPrograms } = await supabase
+        .from('coach_programs')
+        .select('id, title, duration')
+        .eq('assigned_user_id', userId);
+
+      for (const cp of coachPrograms || []) {
+        if (seenIds.has(cp.id)) continue;
+        seenIds.add(cp.id);
+
+        const [{ data: completions }, { count: cpDayCount }] = await Promise.all([
+          supabase
+            .from('day_completions')
+            .select('id, created_at')
+            .eq('user_id', userId)
+            .eq('program_id', cp.id)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('coach_program_days')
+            .select('id', { count: 'exact', head: true })
+            .eq('coach_program_id', cp.id)
+        ]);
+
+        const completedDays = completions?.length || 0;
+        const total = cpDayCount || parseInt(cp.duration) || 42;
+        const percentage = total > 0 ? Math.min(100, Math.round((completedDays / total) * 100)) : 0;
+
+        progressList.push({
+          programId: cp.id,
+          programName: cp.title,
+          totalDays: total,
+          completedDays,
+          percentage,
+          type: 'coach_program',
+          lastActivity: completions?.[0]?.created_at
+        });
+      }
+
+      // Source 2: all programs from day_completions (programs user has done work on)
+      const { data: dayComps } = await supabase
+        .from('day_completions')
+        .select('program_id, program_name, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (dayComps && dayComps.length > 0) {
+        const programIdMap = new Map<string, { name: string; lastActivity: string }>();
+        for (const dc of dayComps) {
+          if (!programIdMap.has(dc.program_id)) {
+            programIdMap.set(dc.program_id, { name: dc.program_name, lastActivity: dc.created_at });
+          }
+        }
+
+        for (const [programId, info] of programIdMap.entries()) {
+          if (seenIds.has(programId)) continue;
+          seenIds.add(programId);
+
+          const completedDays = dayComps.filter(dc => dc.program_id === programId).length;
+
+          // Try programs table first, then coach_programs
+          const { data: programData } = await supabase
+            .from('programs')
+            .select('id, title, days')
+            .eq('id', programId)
+            .maybeSingle();
+
+          let total = 42;
+          let programName = info.name;
+          let type: 'program' | 'coach_program' = 'program';
+
+          if (programData) {
+            total = Array.isArray(programData.days) ? programData.days.length : 42;
+            programName = programData.title || info.name;
+            type = 'program';
+          } else {
+            const { data: cpData } = await supabase
+              .from('coach_programs')
+              .select('id, title, duration, assigned_user_id')
+              .eq('id', programId)
+              .maybeSingle();
+
+            // Skip if program was deleted or unassigned from this user
+            if (!cpData) continue;
+            if (cpData.assigned_user_id !== userId) continue;
+
+            total = parseInt(cpData.duration) || 42;
+            programName = cpData.title || info.name;
+            type = 'coach_program';
+          }
+
+          const percentage = total > 0 ? Math.min(100, Math.round((completedDays / total) * 100)) : 0;
+
+          progressList.push({
+            programId,
+            programName,
+            totalDays: total,
+            completedDays,
+            percentage,
+            type,
+            lastActivity: info.lastActivity
+          });
+        }
+      }
+
+      // Source 3: program_assignments (fallback, may be empty)
       const { data: assignments } = await supabase
         .from('program_assignments')
-        .select(`*,programs(*),coach_programs(*)`)
+        .select('*,programs(*),coach_programs(*)')
         .eq('user_id', userId);
 
-      if (!assignments) return;
-
-      const progressList: WorkoutProgress[] = [];
-
-      for (const assignment of assignments) {
+      for (const assignment of assignments || []) {
         const program = assignment.programs || assignment.coach_programs;
         if (!program) continue;
+        if (seenIds.has(program.id)) continue;
+        seenIds.add(program.id);
 
         const { data: completions } = await supabase
           .from('day_completions')
-          .select('*')
+          .select('id, created_at')
           .eq('user_id', userId)
-          .eq('program_id', assignment.program_id || assignment.coach_program_id);
+          .eq('program_id', assignment.program_id || assignment.coach_program_id)
+          .order('created_at', { ascending: false });
 
-        const totalDays = program.total_days || (program.weeks * 7) || 42;
+        const totalDays = assignment.programs
+          ? (Array.isArray(program.days) ? program.days.length : 42)
+          : (parseInt(program.duration) || 42);
         const completedDays = completions?.length || 0;
-        const percentage = totalDays > 0 ? Math.round((completedDays / totalDays) * 100) : 0;
+        const percentage = totalDays > 0 ? Math.min(100, Math.round((completedDays / totalDays) * 100)) : 0;
 
         progressList.push({
           programId: program.id,
-          programName: program.name,
+          programName: program.title || program.name,
           totalDays,
           completedDays,
           percentage,
           type: assignment.program_id ? 'program' : 'coach_program',
-          lastActivity: completions?.[0]?.completed_at
+          lastActivity: completions?.[0]?.created_at
         });
       }
 

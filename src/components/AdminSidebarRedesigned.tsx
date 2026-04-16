@@ -14,10 +14,10 @@ import {
   Users,
   Server,
   Crown,
-  BarChart3,
   UserPlus,
   GraduationCap,
-  TrendingUp
+  TrendingUp,
+  MessageCircle
 } from 'lucide-react';
 
 interface AdminSidebarRedesignedProps {
@@ -25,13 +25,15 @@ interface AdminSidebarRedesignedProps {
   onTabChange: (tab: string) => void;
   permissions: any;
   userRole: string;
+  onChatOpen?: () => void;
 }
 
 const AdminSidebarRedesigned: React.FC<AdminSidebarRedesignedProps> = ({
   activeTab,
   onTabChange,
   permissions,
-  userRole
+  userRole,
+  onChatOpen
 }) => {
   const getRoleDisplayName = (role: string) => {
     switch (role) {
@@ -108,7 +110,7 @@ const AdminSidebarRedesigned: React.FC<AdminSidebarRedesignedProps> = ({
       id: 'user-progress',
       label: 'User Progress',
       icon: TrendingUp,
-      show: true // Force show for debugging
+      show: permissions.canViewUserProgress
     },
     {
       id: 'user-assignments',
@@ -129,6 +131,7 @@ const AdminSidebarRedesigned: React.FC<AdminSidebarRedesignedProps> = ({
       show: permissions.canViewSystemControl
     },
   ];
+
   return (
     <div className="w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 h-full flex flex-col">
       <div className="p-6 border-b border-gray-200 dark:border-gray-700">
@@ -150,21 +153,19 @@ const AdminSidebarRedesigned: React.FC<AdminSidebarRedesignedProps> = ({
         </div>
       </div>
       
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
         {menuItems.map((item) => {
           if (!item.show) return null;
-          
           const Icon = item.icon;
           const isActive = activeTab === item.id;
-          
           return (
             <Button
               key={item.id}
               variant={isActive ? "default" : "ghost"}
               className={cn(
                 "w-full justify-start gap-3 h-11 text-left",
-                isActive 
-                  ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-r-2 border-blue-600" 
+                isActive
+                  ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-r-2 border-blue-600"
                   : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800"
               )}
               onClick={() => onTabChange(item.id)}
@@ -174,6 +175,16 @@ const AdminSidebarRedesigned: React.FC<AdminSidebarRedesignedProps> = ({
             </Button>
           );
         })}
+
+        {/* Chat — opens panel, not a tab */}
+        <Button
+          variant="ghost"
+          className="w-full justify-start gap-3 h-11 text-left text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800"
+          onClick={onChatOpen}
+        >
+          <MessageCircle className="w-5 h-5" />
+          <span className="font-medium">Chat</span>
+        </Button>
       </nav>
     </div>
   );

@@ -41,10 +41,13 @@ export const LinkSelectorSimple: React.FC<LinkSelectorSimpleProps> = ({
   const [dietPlans, setDietPlans] = useState<DietPlan[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const TRACKER_PAGES = ['water tracker', 'weight tracker', 'step tracker', 'calorie tracker'];
+
   const [linkType, setLinkType] = useState(() => {
     if (coachProgramId || value.startsWith('/coach-program/')) return 'coach-program';
     if (programId || value.startsWith('/program/')) return 'program';
     if (value.startsWith('/diet/')) return 'diet';
+    if (value.startsWith('/tracker/')) return 'tracker';
     if (value.startsWith('/page/')) return 'page';
     if (value.startsWith('http')) return 'external';
     return 'none';
@@ -120,6 +123,10 @@ export const LinkSelectorSimple: React.FC<LinkSelectorSimpleProps> = ({
     }
   };
 
+  const handleTrackerSelect = (trackerName: string) => {
+    onChange(`/tracker/${trackerName}`);
+  };
+
   const handleProgramSelect = (selectedProgramId: string) => {
     onChange(`/program/${selectedProgramId}`);
     if (onProgramChange) onProgramChange(selectedProgramId);
@@ -145,9 +152,10 @@ export const LinkSelectorSimple: React.FC<LinkSelectorSimpleProps> = ({
   const getCurrentValue = () => {
     if (linkType === 'diet') return value.replace('/diet/', '');
     if (linkType === 'page') return value.replace('/page/', '');
+    if (linkType === 'tracker') return value.replace('/tracker/', '');
     return value;
   };
-  
+
   return (
     <div className="space-y-3">
       <Label>Link to Feature</Label>
@@ -159,8 +167,9 @@ export const LinkSelectorSimple: React.FC<LinkSelectorSimpleProps> = ({
           <SelectItem value="none">No Link</SelectItem>
           <SelectItem value="program">Program</SelectItem>
           <SelectItem value="coach-program">Coach Program</SelectItem>
+          <SelectItem value="tracker">Tracker</SelectItem>
           <SelectItem value="diet">Diet Plan</SelectItem>
-          <SelectItem value="page">Calculator/Tracker</SelectItem>
+          <SelectItem value="page">App Page</SelectItem>
           <SelectItem value="external">External URL</SelectItem>
         </SelectContent>
       </Select>
@@ -219,19 +228,35 @@ export const LinkSelectorSimple: React.FC<LinkSelectorSimpleProps> = ({
         </div>
       )}
 
+      {linkType === 'tracker' && (
+        <div>
+          <Label className="text-sm text-gray-600">Select Tracker</Label>
+          <Select value={getCurrentValue()} onValueChange={handleTrackerSelect}>
+            <SelectTrigger>
+              <SelectValue placeholder="Choose a tracker" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="water tracker">Water Tracker</SelectItem>
+              <SelectItem value="weight tracker">Weight Tracker</SelectItem>
+              <SelectItem value="step tracker">Step Tracker</SelectItem>
+              <SelectItem value="calorie tracker">Calorie Tracker</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {linkType === 'page' && (
         <div>
-          <Label className="text-sm text-gray-600">Select Calculator/Tracker</Label>
+          <Label className="text-sm text-gray-600">Select App Page</Label>
           <Select value={getCurrentValue()} onValueChange={handlePageSelect}>
             <SelectTrigger>
-              <SelectValue placeholder="Choose a feature" />
+              <SelectValue placeholder="Choose a page" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="calculator">Calorie Calculator</SelectItem>
-              <SelectItem value="chat">AI Chat</SelectItem>
-              <SelectItem value="dashboard">Dashboard</SelectItem>
               <SelectItem value="programs">All Programs</SelectItem>
-              <SelectItem value="diets">All Diet Plans</SelectItem>
+              <SelectItem value="coach-programs">Coach Programs</SelectItem>
+              <SelectItem value="chat">Chat</SelectItem>
             </SelectContent>
           </Select>
         </div>

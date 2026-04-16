@@ -2,46 +2,49 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useHomePage } from '@/contexts/HomePageContext';
 import HomePageEditor from './HomePageEditor';
-import WorkoutHistoryTracker from './WorkoutHistoryTracker';
-import EditableDietPlanDashboard from './EditableDietPlanDashboard';
-import { Eye, Edit, Save, RotateCcw, Database } from 'lucide-react';
+import HomePagePreview from './HomePagePreview';
+import { Eye, Edit, Save, RotateCcw, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const AdminHomePageManager: React.FC = () => {
   const { toast } = useToast();
-  const { 
-    homePageItems, 
-    updateHomePageItems, 
-    resetToDefaults, 
-    saveToDatabase, 
+  const {
+    homePageItems,
+    updateHomePageItems,
+    resetToDefaults,
+    saveToDatabase,
     loadFromDatabase,
     isUpdating
   } = useHomePage();
   const [activeTab, setActiveTab] = useState('editor');
   const [isLoading, setIsLoading] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   useEffect(() => {
     loadFromDatabase();
   }, []);
 
   const handleSaveChanges = async () => {
-    console.log('AdminHomePageManager: handleSaveChanges called');
     setIsLoading(true);
     try {
-      console.log('AdminHomePageManager: Calling saveToDatabase...');
       await saveToDatabase();
-      console.log('AdminHomePageManager: saveToDatabase completed successfully');
-      toast({
-        title: "Changes Saved",
-        description: "Home page items have been saved to database successfully.",
-      });
+      toast({ title: "Changes Saved", description: "Home page saved successfully." });
     } catch (error) {
-      console.error('AdminHomePageManager: Error saving changes:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save changes to database.",
+        description: error instanceof Error ? error.message : "Failed to save changes.",
         variant: "destructive"
       });
     } finally {
@@ -50,42 +53,28 @@ const AdminHomePageManager: React.FC = () => {
   };
 
   const handleResetChanges = async () => {
-    console.log('AdminHomePageManager: handleResetChanges called');
     try {
       resetToDefaults();
-      console.log('AdminHomePageManager: Calling saveToDatabase after reset...');
       await saveToDatabase();
-      console.log('AdminHomePageManager: Reset and save completed successfully');
-      toast({
-        title: "Changes Reset",
-        description: "Home page items have been reset to defaults and saved.",
-      });
+      toast({ title: "Reset Complete", description: "Home page reset to defaults." });
     } catch (error) {
-      console.error('AdminHomePageManager: Error resetting changes:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to reset and save changes.",
+        description: error instanceof Error ? error.message : "Failed to reset.",
         variant: "destructive"
       });
     }
   };
 
-  const handleLoadFromDatabase = async () => {
-    console.log('AdminHomePageManager: handleLoadFromDatabase called');
+  const handleRefresh = async () => {
     setIsLoading(true);
     try {
-      console.log('AdminHomePageManager: Calling loadFromDatabase...');
       await loadFromDatabase();
-      console.log('AdminHomePageManager: loadFromDatabase completed successfully');
-      toast({
-        title: "Data Loaded",
-        description: "Home page items loaded from database.",
-      });
+      toast({ title: "Refreshed", description: "Home page items reloaded from database." });
     } catch (error) {
-      console.error('AdminHomePageManager: Error loading from database:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to load data from database.",
+        description: error instanceof Error ? error.message : "Failed to refresh.",
         variant: "destructive"
       });
     } finally {
@@ -94,20 +83,13 @@ const AdminHomePageManager: React.FC = () => {
   };
 
   const handleUpdateItems = async (items) => {
-    console.log('AdminHomePageManager: handleUpdateItems called with:', items);
     try {
-      console.log('AdminHomePageManager: Calling updateHomePageItems...');
       await updateHomePageItems(items);
-      console.log('AdminHomePageManager: updateHomePageItems completed successfully');
-      toast({
-        title: "Items Updated",
-        description: "Home page items have been updated and saved.",
-      });
+      toast({ title: "Saved", description: "Home page items updated." });
     } catch (error) {
-      console.error('AdminHomePageManager: Error updating items:', error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update home page items.",
+        description: error instanceof Error ? error.message : "Failed to update items.",
         variant: "destructive"
       });
     }
@@ -118,27 +100,27 @@ const AdminHomePageManager: React.FC = () => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Home Page Manager</h2>
-          <p className="text-gray-600">Edit and customize the home page features with linking</p>
+          <p className="text-gray-600">Edit and customize the home page items and links</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            onClick={handleLoadFromDatabase}
+          <Button
+            variant="outline"
+            onClick={handleRefresh}
             disabled={isLoading || isUpdating}
           >
-            <Database className="w-4 h-4 mr-2" />
-            Load
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Refresh
           </Button>
-          <Button 
-            variant="outline" 
-            onClick={handleResetChanges}
+          <Button
+            variant="outline"
+            onClick={() => setShowResetConfirm(true)}
             disabled={isLoading || isUpdating}
           >
             <RotateCcw className="w-4 h-4 mr-2" />
-            Reset
+            Reset to Defaults
           </Button>
-          <Button 
-            onClick={handleSaveChanges} 
+          <Button
+            onClick={handleSaveChanges}
             className="bg-green-600 hover:bg-green-700"
             disabled={isLoading || isUpdating}
           >
@@ -147,12 +129,9 @@ const AdminHomePageManager: React.FC = () => {
           </Button>
         </div>
       </div>
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="history">
-            <Database className="w-4 h-4 mr-2" />
-            Workout History
-          </TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="editor">
             <Edit className="w-4 h-4 mr-2" />
             Editor
@@ -162,31 +141,36 @@ const AdminHomePageManager: React.FC = () => {
             Preview
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="history">
-          <Card>
-            <CardHeader>
-              <CardTitle>Workout History & Statistics</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <WorkoutHistoryTracker />
-            </CardContent>
-          </Card>
-        </TabsContent>
+
         <TabsContent value="editor">
           <HomePageEditor items={homePageItems} onUpdateItems={handleUpdateItems} />
         </TabsContent>
 
         <TabsContent value="preview">
-          <Card>
-            <CardHeader>
-              <CardTitle>Live Preview</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <EditableDietPlanDashboard homePageItems={homePageItems} />
-            </CardContent>
-          </Card>
+          <HomePagePreview homePageItems={homePageItems} />
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset to Defaults?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will replace all current home page items with the defaults and save immediately.
+              This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => { setShowResetConfirm(false); handleResetChanges(); }}
+            >
+              Reset
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { useDesign } from '@/contexts/DesignContext';
 import { useFitness } from '@/contexts/FitnessContext';
 import { useHomePage } from '@/contexts/HomePageContext';
-import { useAppContext } from '@/contexts/AppContext';
 import AdminSidebarRedesigned from './AdminSidebarRedesigned';
 import AdminTopBar from './AdminTopBar';
-import { CoachProgramTabFixed } from './CoachProgramTabFixed';
 import AdminOverviewDashboard from './AdminOverviewDashboard';
 import AuthForm from './AuthForm';
 import CoachChatPanel from './CoachChatPanel';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
-import { Palette } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { useTheme } from './theme-provider';
 
 // Tab content components
 import AdminProgramManager from './AdminProgramManager';
@@ -25,19 +24,17 @@ import UserPanelTab from './UserPanelTab';
 import SystemControlTab from './SystemControlTab';
 import AdminPersonalPathManager from './AdminPersonalPathManager';
 import { ExerciseLibraryManager } from './ExerciseLibraryManager';
-import EnhancedCoachProgressDashboard from './EnhancedCoachProgressDashboard';
 import UserAssignmentManager from './UserAssignmentManager';
 
 const AdminLayoutSimplified: React.FC = () => {
   const { refreshPrograms } = useFitness();
   const { refreshHomePageItems } = useHomePage();
-  const { currentUser } = useAppContext();
+  const { theme, setTheme } = useTheme();
   
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
-  const [showDesignEditor, setShowDesignEditor] = useState(false);
   const [showChatPanel, setShowChatPanel] = useState(false);
   const [userRole, setUserRole] = useState<string>('user');
 
@@ -108,10 +105,6 @@ const AdminLayoutSimplified: React.FC = () => {
     setActiveTab('settings');
   };
 
-  const isAdminRole = () => {
-    return ['super_admin', 'admin', 'coach'].includes(userRole);
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-900">
@@ -154,16 +147,33 @@ const AdminLayoutSimplified: React.FC = () => {
         return (userRole === 'coach' || userRole === 'admin' || userRole === 'super_admin') ? 
           <EnhancedUserProgressTabComplete userRole={userRole} currentUserId={user?.id} /> : null;
       case 'admin-invites':
+        return permissions.canViewAdminInvites ? <AdminPanelTab /> : null;
       case 'all-users':
+        return <UserPanelTab />;
       case 'settings':
         return (
-          <div className="p-6">
-            <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-gray-100">Application Settings</h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">Customize the appearance and behavior of your fitness application.</p>
-            <Button onClick={() => setShowDesignEditor(true)} className="bg-gradient-to-r from-orange-500 to-blue-600 text-white hover:from-orange-600 hover:to-blue-700">
-              <Palette className="w-4 h-4 mr-2" />
-              Open Design Editor
-            </Button>
+          <div className="p-6 max-w-lg">
+            <h3 className="text-xl font-semibold mb-1 text-gray-900 dark:text-gray-100">Settings</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Manage your admin preferences.</p>
+            <div className="space-y-4">
+              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex items-center justify-between">
+                <div>
+                  <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">Dark Mode</Label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Switch between light and dark theme</p>
+                </div>
+                <Switch
+                  checked={theme === 'dark'}
+                  onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+                />
+              </div>
+              <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
+                <Label className="text-sm font-medium text-gray-900 dark:text-gray-100">Account</Label>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 mb-3">Signed in as {user?.email}</p>
+                <Button variant="outline" size="sm" onClick={handleSignOut} className="text-red-600 border-red-200 hover:bg-red-50 dark:hover:bg-red-950">
+                  Sign Out
+                </Button>
+              </div>
+            </div>
           </div>
         );
       case 'system-control':
@@ -173,38 +183,41 @@ const AdminLayoutSimplified: React.FC = () => {
     }
   };
 
-  // Simple permissions for sidebar
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+
+  // Permissions — coaches see only what's relevant to them
   const permissions = {
     canViewOverview: true,
-    canViewHome: true,
-    canViewPrograms: true,
+    canViewHome: isAdmin,
+    canViewPrograms: isAdmin,
     canViewCoachPrograms: true,
-    canViewPersonalizedPrograms: true,
+    canViewPersonalizedPrograms: isAdmin,
     canViewExercises: true,
-    canViewPersonalPath: true,
-    canViewMedia: true,
-    canViewTimers: true,
-
+    canViewPersonalPath: isAdmin,
+    canViewMedia: isAdmin,
+    canViewTimers: isAdmin,
+    canViewUserProgress: true,
     canAssignUsers: userRole === 'super_admin',
-    canViewAdminInvites: userRole !== 'coach',
-    canViewAllUsers: true,
+    canViewAdminInvites: isAdmin,
+    canViewAllUsers: isAdmin,
     canViewSettings: true,
     canViewSystemControl: userRole === 'super_admin'
   };
 
   return (
     <div className="h-screen flex bg-gray-50 dark:bg-gray-900 overflow-hidden">
-      <AdminSidebarRedesigned 
+      <AdminSidebarRedesigned
         activeTab={activeTab}
         onTabChange={setActiveTab}
         permissions={permissions}
         userRole={userRole}
+        onChatOpen={() => setShowChatPanel(true)}
       />
       
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <AdminTopBar 
           userDisplayName={getUserDisplayName()}
-          onProfileClick={() => console.log('Profile clicked')}
+          onProfileClick={() => setActiveTab('settings')}
           onSignOut={handleSignOut}
           onSettingsClick={handleSettingsClick}
           onChatClick={() => setShowChatPanel(true)}
@@ -218,16 +231,7 @@ const AdminLayoutSimplified: React.FC = () => {
         </main>
       </div>
 
-      {showDesignEditor && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Design Editor</h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">Design editor functionality will be implemented here.</p>
-            <Button onClick={() => setShowDesignEditor(false)}>Close</Button>
-          </div>
-        </div>
-      )}
-      <CoachChatPanel 
+      <CoachChatPanel
         isOpen={showChatPanel} 
         onClose={() => setShowChatPanel(false)}
         currentUser={user ? { id: user.id, name: getUserDisplayName() } : null}

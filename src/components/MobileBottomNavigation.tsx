@@ -5,8 +5,6 @@ import { Home, Heart, Calculator } from 'lucide-react';
 interface MobileBottomNavigationProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
-  onChatOpen?: () => void;
-  unreadCount?: number;
 }
 
 export const MobileBottomNavigation: React.FC<MobileBottomNavigationProps> = ({

@@ -9,7 +9,6 @@ import { BeginnerFriendlyProgressTracker } from './BeginnerFriendlyProgressTrack
 import { WorkoutTrackerCard } from './WorkoutTrackerCard';
 import { WorkoutHistoryDetail } from './WorkoutHistoryDetail';
 import { AutoTrackerCards } from './AutoTrackerCards';
-import { PersonalizedProgramsSection } from './PersonalizedProgramsSection';
 import { HomePageItemCard } from './HomePageItemCard';
 import { useOptimizedPrograms } from '@/hooks/useOptimizedPrograms';
 import { useHomePage } from '@/contexts/HomePageContext';
@@ -46,29 +45,22 @@ export const ModernUserDashboard: React.FC<ModernUserDashboardProps> = ({
   }, []);
 
   useEffect(() => {
-    if (currentUser?.id) fetchDashboardStats(currentUser.id);
-  }, [currentUser?.id]);
+    if (currentUser?.id && !loading) fetchDashboardStats(currentUser.id);
+  }, [currentUser?.id, programs, loading]);
 
   const fetchDashboardStats = async (userId: string) => {
     try {
-      const [completionsRes, dayCompletionsRes] = await Promise.all([
-        supabase
-          .from('workout_completions')
-          .select('completed_at')
-          .eq('user_id', userId)
-          .order('completed_at', { ascending: false }),
-        supabase
-          .from('day_completions')
-          .select('id', { count: 'exact' })
-          .eq('user_id', userId)
-      ]);
+      const { data: dayCompletionsData, count: dayCompletionsCount } = await supabase
+        .from('day_completions')
+        .select('created_at', { count: 'exact' })
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
 
-      // Calculate streak (consecutive days with workout completions)
+      // Calculate streak from day_completions using created_at
       let streak = 0;
-      if (completionsRes.data && completionsRes.data.length > 0) {
-        const days = new Set(completionsRes.data.map((c: any) => c.completed_at.split('T')[0]));
+      if (dayCompletionsData && dayCompletionsData.length > 0) {
+        const days = new Set(dayCompletionsData.map((c: any) => c.created_at.split('T')[0]));
         const check = new Date();
-        // Allow streak to count if today or yesterday had activity
         if (!days.has(check.toISOString().split('T')[0])) {
           check.setDate(check.getDate() - 1);
         }
@@ -78,7 +70,7 @@ export const ModernUserDashboard: React.FC<ModernUserDashboardProps> = ({
         }
       }
 
-      const goalsCompleted = dayCompletionsRes.count ?? 0;
+      const goalsCompleted = dayCompletionsCount ?? 0;
 
       // Progress: completed days as % of total program days available
       const totalProgramDays = programs.filter(p => p.isActive).reduce((sum, p) => sum + (p.days?.length || 0), 0);
@@ -118,6 +110,11 @@ export const ModernUserDashboard: React.FC<ModernUserDashboardProps> = ({
   };
 
   const handleHomePageItemClick = async (item: any) => {
+    if (item.link?.startsWith('/tracker/')) {
+      setSelectedTracker(item.link.replace('/tracker/', ''));
+      setShowProgressTracker(true);
+      return;
+    }
     if (isTrackableItem(item.title)) {
       setSelectedTracker(item.title);
       setShowProgressTracker(true);
@@ -210,7 +207,7 @@ export const ModernUserDashboard: React.FC<ModernUserDashboardProps> = ({
         <div className="relative z-10">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-2xl md:text-3xl font-bold mb-2">Welcome Back!</h2>
+              <h2 className="text-2xl md:text-3xl font-bold mb-2">Welcome back, {currentUser?.name || 'there'}!</h2>
               <p className="text-orange-100 text-sm md:text-base">{formatDate(currentDate)}</p>
             </div>
             <div className="hidden md:block">
@@ -308,21 +305,15 @@ export const ModernUserDashboard: React.FC<ModernUserDashboardProps> = ({
                   <p className="text-gray-600">Loading programs...</p>
                 </div>
               ) : (
-                <div className="space-y-8">
-                  <PersonalizedProgramsSection onViewProgram={onViewProgram} />
-                  <div>
-                    <h4 className="text-lg font-semibold text-gray-800 mb-4">All Programs</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {programs.filter(p => p.isActive).map((program) => (
-                        <ProgramCard key={program.id} program={program} onView={() => handleProgramClick(program)} isAdmin={false} />
-                      ))}
-                      {programs.filter(p => p.isActive).length === 0 && (
-                        <div className="col-span-full text-center py-12">
-                          <p className="text-gray-600">No active programs available</p>
-                        </div>
-                      )}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {programs.filter(p => p.isActive).map((program) => (
+                    <ProgramCard key={program.id} program={program} onView={() => handleProgramClick(program)} isAdmin={false} />
+                  ))}
+                  {programs.filter(p => p.isActive).length === 0 && (
+                    <div className="col-span-full text-center py-12">
+                      <p className="text-gray-600">No active programs available</p>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>

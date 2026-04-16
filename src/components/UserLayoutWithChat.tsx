@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useDesign } from '@/contexts/DesignContext';
 import { useHomePage } from '@/contexts/HomePageContext';
 import { useFitness } from '@/contexts/FitnessContext';
 import { useAppContext } from '@/contexts/AppContext';
@@ -7,13 +6,12 @@ import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 
-import { Crown, Home, Heart, Calculator, Menu, X } from 'lucide-react';
+import { Crown, Home, Heart, Calculator } from 'lucide-react';
 import ModernUserDashboard from './ModernUserDashboard';
 import UserProfile from './UserProfile';
 import UserProfileDropdown from './UserProfileDropdown';
 import AuthForm from './AuthForm';
 import UserChatPanel from './UserChatPanel';
-import EnhancedFloatingChatButton from './EnhancedFloatingChatButton';
 import MobileBottomNavigation from './MobileBottomNavigation';
 import ChatNotificationBadge from './ChatNotificationBadge';
 import { NotificationBellIcon } from './NotificationBellIcon';
@@ -34,8 +32,6 @@ const UserLayoutWithChat: React.FC = () => {
   const [showChatPanel, setShowChatPanel] = useState(false);
   const [showNotificationPreferences, setShowNotificationPreferences] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(location.search);
     return params.get('tab') || 'home';
@@ -142,7 +138,6 @@ const UserLayoutWithChat: React.FC = () => {
               <NotificationBellIcon userId={user?.id} />
               <ChatNotificationBadge userId={user?.id} onClick={handleChatOpen} variant="user" />
               <div style={{ marginLeft: '6px' }}><UserProfileDropdown userDisplayName={getUserDisplayName()} onProfileClick={() => { setShowProfile(true); setViewingProgram(undefined); }} onSignOut={handleSignOut} onSettingsClick={() => setShowNotificationPreferences(true)} isAdmin={isAdmin} /></div>
-              <Button variant="ghost" size="sm" className="md:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>{mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}</Button>
             </div>
 
 
@@ -167,12 +162,9 @@ const UserLayoutWithChat: React.FC = () => {
 
 
       {/* ── Fixed Bottom Nav (mobile only) ───────────────────── */}
-      <MobileBottomNavigation activeTab={activeTab} onTabChange={handleTabChange} onChatOpen={handleChatOpen} unreadCount={0} />
+      <MobileBottomNavigation activeTab={activeTab} onTabChange={handleTabChange} />
 
-      {/* ── Floating Chat Button (desktop only) ──────────────── */}
-      <EnhancedFloatingChatButton currentUser={user ? { id: user.id, name: getUserDisplayName() } : null} onClick={handleChatOpen} />
-
-      <UserChatPanel isOpen={showChatPanel} onClose={() => setShowChatPanel(false)} currentUser={user ? { id: user.id, name: getUserDisplayName() } : null} />
+<UserChatPanel isOpen={showChatPanel} onClose={() => setShowChatPanel(false)} currentUser={user ? { id: user.id, name: getUserDisplayName() } : null} />
       <NotificationPreferencesModal
         isOpen={showNotificationPreferences}
         onClose={() => setShowNotificationPreferences(false)}

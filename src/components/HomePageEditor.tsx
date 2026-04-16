@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Edit, Trash2, Save, Link } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, Link, ChevronUp, ChevronDown } from 'lucide-react';
 import { LinkSelectorSimple } from './LinkSelectorSimple';
 import { useToast } from '@/hooks/use-toast';
 
@@ -47,17 +47,12 @@ const HomePageEditor: React.FC<HomePageEditorProps> = ({ items, onUpdateItems })
 
   const handleSaveItem = async () => {
     if (!editingItem) return;
-    
-    console.log('HomePageEditor: handleSaveItem called with:', editingItem);
     setIsSaving(true);
     try {
       const updatedItems = editingItem.id === 'new' 
         ? [...items, { ...editingItem, id: Date.now().toString() }]
         : items.map(item => item.id === editingItem.id ? editingItem : item);
-      
-      console.log('HomePageEditor: Calling onUpdateItems with:', updatedItems);
       await onUpdateItems(updatedItems);
-      console.log('HomePageEditor: onUpdateItems completed successfully');
       
       toast({
         title: "Item Saved",
@@ -67,7 +62,6 @@ const HomePageEditor: React.FC<HomePageEditorProps> = ({ items, onUpdateItems })
       setEditingItem(null);
       setIsDialogOpen(false);
     } catch (error) {
-      console.error('HomePageEditor: Error saving item:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to save home page item.",
@@ -79,20 +73,16 @@ const HomePageEditor: React.FC<HomePageEditorProps> = ({ items, onUpdateItems })
   };
 
   const handleDeleteItem = async (id: string) => {
-    console.log('HomePageEditor: handleDeleteItem called with id:', id);
     setIsSaving(true);
     try {
       const updatedItems = items.filter(item => item.id !== id);
-      console.log('HomePageEditor: Calling onUpdateItems for delete with:', updatedItems);
       await onUpdateItems(updatedItems);
-      console.log('HomePageEditor: Delete onUpdateItems completed successfully');
       
       toast({
         title: "Item Deleted",
         description: "Home page item has been deleted successfully.",
       });
     } catch (error) {
-      console.error('HomePageEditor: Error deleting item:', error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to delete home page item.",
@@ -103,8 +93,18 @@ const HomePageEditor: React.FC<HomePageEditorProps> = ({ items, onUpdateItems })
     }
   };
 
+  const handleMoveItem = async (index: number, direction: 'up' | 'down') => {
+    const sorted = [...items].sort((a, b) => a.order - b.order);
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= sorted.length) return;
+
+    const reordered = [...sorted];
+    [reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]];
+    const updated = reordered.map((item, i) => ({ ...item, order: i }));
+    await onUpdateItems(updated);
+  };
+
   const handleAddNew = () => {
-    console.log('HomePageEditor: handleAddNew called');
     setEditingItem({
       id: 'new',
       title: '',
@@ -130,8 +130,28 @@ const HomePageEditor: React.FC<HomePageEditorProps> = ({ items, onUpdateItems })
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {items.map((item) => (
+          {[...items].sort((a, b) => a.order - b.order).map((item, index, sorted) => (
             <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg">
+              <div className="flex flex-col gap-1 mr-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={() => handleMoveItem(index, 'up')}
+                  disabled={isSaving || index === 0}
+                >
+                  <ChevronUp className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={() => handleMoveItem(index, 'down')}
+                  disabled={isSaving || index === sorted.length - 1}
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </Button>
+              </div>
               <div className="flex-1">
                 <h3 className="font-semibold">{item.title}</h3>
                 <p className="text-sm text-gray-600">{item.description}</p>
@@ -140,7 +160,7 @@ const HomePageEditor: React.FC<HomePageEditorProps> = ({ items, onUpdateItems })
                   {item.link && (
                     <span className="flex items-center gap-1">
                       <Link className="w-3 h-3" />
-                      Linked
+                      {item.link.startsWith('/tracker/') ? `Tracker: ${item.link.replace('/tracker/', '')}` : 'Linked'}
                     </span>
                   )}
                 </div>
@@ -150,7 +170,6 @@ const HomePageEditor: React.FC<HomePageEditorProps> = ({ items, onUpdateItems })
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    console.log('HomePageEditor: Edit button clicked for item:', item);
                     setEditingItem(item);
                     setIsDialogOpen(true);
                   }}
@@ -237,15 +256,12 @@ const HomePageEditor: React.FC<HomePageEditorProps> = ({ items, onUpdateItems })
                   programId={editingItem.programId} // Pass programId prop
                   coachProgramId={editingItem.coachProgramId} // Pass coachProgramId prop
                   onChange={(link) => {
-                    console.log('HomePageEditor: Link changed to:', link);
                     setEditingItem({...editingItem, link});
                   }}
                   onProgramChange={(programId) => {
-                    console.log('HomePageEditor: Program ID changed to:', programId);
                     setEditingItem({...editingItem, programId: programId || undefined});
                   }}
                   onCoachProgramChange={(coachProgramId) => {
-                    console.log('HomePageEditor: Coach Program ID changed to:', coachProgramId);
                     setEditingItem({...editingItem, coachProgramId: coachProgramId || undefined});
                   }}
                 />

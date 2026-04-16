@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Calendar, Clock, Dumbbell, TrendingUp, Award } from 'lucide-react';
+import { ArrowLeft, Calendar, Dumbbell, TrendingUp, Award, CheckCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
-interface WorkoutCompletion {
+interface DayCompletion {
   id: string;
   user_id: string;
   program_id: string;
-  workout_name: string;
-  completed_at: string;
-  duration_minutes: number;
-  exercises_completed: number;
-  total_exercises: number;
+  program_name: string;
+  day_number: number;
+  day_title: string;
+  total_workouts: number;
+  completed_workouts: number;
+  completion_percentage: number;
+  created_at: string;
 }
 
 interface WorkoutHistoryDetailProps {
@@ -20,12 +22,11 @@ interface WorkoutHistoryDetailProps {
 }
 
 export const WorkoutHistoryDetail: React.FC<WorkoutHistoryDetailProps> = ({ onBack }) => {
-  const [workouts, setWorkouts] = useState<WorkoutCompletion[]>([]);
+  const [completions, setCompletions] = useState<DayCompletion[]>([]);
   const [stats, setStats] = useState({
+    totalDays: 0,
+    avgCompletion: 0,
     totalWorkouts: 0,
-    totalMinutes: 0,
-    averageDuration: 0,
-    completionRate: 0,
     streak: 0
   });
   const [loading, setLoading] = useState(true);
@@ -39,49 +40,36 @@ export const WorkoutHistoryDetail: React.FC<WorkoutHistoryDetailProps> = ({ onBa
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: completions, error } = await supabase
-        .from('workout_completions')
+      const { data, error } = await supabase
+        .from('day_completions')
         .select('*')
         .eq('user_id', user.id)
-        .order('completed_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      if (completions) {
-        setWorkouts(completions);
-        
-        // Calculate comprehensive stats
-        const totalWorkouts = completions.length;
-        const totalMinutes = completions.reduce((sum, w) => sum + (w.duration_minutes || 0), 0);
-        const avgDuration = totalWorkouts > 0 ? Math.round(totalMinutes / totalWorkouts) : 0;
-        const completionRate = completions.length > 0 ? 
-          Math.round((completions.reduce((sum, w) => sum + w.exercises_completed, 0) / 
-                     completions.reduce((sum, w) => sum + w.total_exercises, 0)) * 100) : 0;
+      if (data) {
+        setCompletions(data);
 
-        // Calculate streak
+        const totalDays = data.length;
+        const totalWorkouts = data.reduce((sum, d) => sum + (d.completed_workouts || 0), 0);
+        const avgCompletion = totalDays > 0
+          ? Math.round(data.reduce((sum, d) => sum + (d.completion_percentage || 0), 0) / totalDays)
+          : 0;
+
+        // Calculate streak from consecutive days
         let streak = 0;
-        const now = new Date();
-        const sortedDates = completions.map(w => new Date(w.completed_at).toDateString());
-        const uniqueDates = [...new Set(sortedDates)].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-        
-        for (let i = 0; i < uniqueDates.length; i++) {
-          const currentDate = new Date(uniqueDates[i]);
-          const expectedDate = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-          
-          if (currentDate.toDateString() === expectedDate.toDateString()) {
-            streak++;
-          } else {
-            break;
-          }
+        const days = new Set(data.map((d) => d.created_at.split('T')[0]));
+        const check = new Date();
+        if (!days.has(check.toISOString().split('T')[0])) {
+          check.setDate(check.getDate() - 1);
+        }
+        while (days.has(check.toISOString().split('T')[0])) {
+          streak++;
+          check.setDate(check.getDate() - 1);
         }
 
-        setStats({
-          totalWorkouts,
-          totalMinutes,
-          averageDuration: avgDuration,
-          completionRate,
-          streak
-        });
+        setStats({ totalDays, avgCompletion, totalWorkouts, streak });
       }
     } catch (error) {
       console.error('Error fetching workout history:', error);
@@ -96,14 +84,6 @@ export const WorkoutHistoryDetail: React.FC<WorkoutHistoryDetailProps> = ({ onBa
       month: 'short',
       day: 'numeric',
       year: 'numeric'
-    });
-  };
-
-  const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
     });
   };
 
@@ -123,20 +103,20 @@ export const WorkoutHistoryDetail: React.FC<WorkoutHistoryDetailProps> = ({ onBa
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-blue-600">{stats.totalWorkouts}</div>
+            <div className="text-2xl font-bold text-blue-600">{stats.totalDays}</div>
+            <div className="text-sm text-gray-600">Days Completed</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 text-center">
+            <div className="text-2xl font-bold text-green-600">{stats.totalWorkouts}</div>
             <div className="text-sm text-gray-600">Total Workouts</div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">{stats.totalMinutes}</div>
-            <div className="text-sm text-gray-600">Total Minutes</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-purple-600">{stats.averageDuration}</div>
-            <div className="text-sm text-gray-600">Avg Duration</div>
+            <div className="text-2xl font-bold text-purple-600">{stats.avgCompletion}%</div>
+            <div className="text-sm text-gray-600">Avg Completion</div>
           </CardContent>
         </Card>
         <Card>
@@ -147,12 +127,12 @@ export const WorkoutHistoryDetail: React.FC<WorkoutHistoryDetailProps> = ({ onBa
         </Card>
       </div>
 
-      {/* Workout History List */}
+      {/* History List */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Dumbbell className="w-5 h-5" />
-            Recent Workouts
+            Completed Days
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -168,7 +148,7 @@ export const WorkoutHistoryDetail: React.FC<WorkoutHistoryDetailProps> = ({ onBa
                 </div>
               ))}
             </div>
-          ) : workouts.length === 0 ? (
+          ) : completions.length === 0 ? (
             <div className="text-center py-8">
               <Dumbbell className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-600">No workouts completed yet</p>
@@ -176,31 +156,28 @@ export const WorkoutHistoryDetail: React.FC<WorkoutHistoryDetailProps> = ({ onBa
             </div>
           ) : (
             <div className="space-y-3">
-              {workouts.map((workout) => (
-                <div key={workout.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+              {completions.map((item) => (
+                <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
                   <div className="flex items-center space-x-4">
                     <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center">
-                      <Dumbbell className="w-5 h-5 text-blue-600" />
+                      <CheckCircle className="w-5 h-5 text-blue-600" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900">{workout.workout_name}</h4>
-                      <div className="flex items-center space-x-4 text-sm text-gray-600">
-                        <div className="flex items-center space-x-1">
-                          <Calendar className="w-4 h-4" />
-                          <span>{formatDate(workout.completed_at)}</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Clock className="w-4 h-4" />
-                          <span>{workout.duration_minutes || 0} min</span>
-                        </div>
+                      <h4 className="font-semibold text-gray-900">
+                        {item.day_title || `Day ${item.day_number}`}
+                      </h4>
+                      <p className="text-xs text-gray-500 mb-1">{item.program_name}</p>
+                      <div className="flex items-center space-x-1 text-sm text-gray-600">
+                        <Calendar className="w-4 h-4" />
+                        <span>{formatDate(item.created_at)}</span>
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-medium text-gray-900">
-                      {workout.exercises_completed}/{workout.total_exercises} exercises
+                      {item.completed_workouts}/{item.total_workouts} workouts
                     </div>
-                    <div className="text-xs text-gray-500">{formatTime(workout.completed_at)}</div>
+                    <div className="text-xs text-green-600 font-semibold">{item.completion_percentage}% complete</div>
                   </div>
                 </div>
               ))}
